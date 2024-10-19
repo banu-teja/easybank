@@ -1,12 +1,14 @@
 package main
 
 import (
-	"net/http"
+	"context"
 
-	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 
-	"github.com/bhanu-teja-naidu/easybank/util"
+	"github.com/banu-teja/easybank/api"
+	db "github.com/banu-teja/easybank/db/sqlc"
+	"github.com/banu-teja/easybank/util"
 )
 
 func main() {
@@ -15,14 +17,19 @@ func main() {
 		log.Fatal().Err(err).Msg("cannot load config")
 	}
 
-	router := gin.Default()
+	connPool, err := pgxpool.New(context.Background(), config.DBSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot connect to db")
+	}
 
-	router.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Hello world!",
-		})
-	})
+	store := db.NewStore(connPool)
+	serve, err := api.NewServer(config, store)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create server")
+	}
 
-	router.Run(config.HttpServerAddress)
-
+	err = serve.Start(config.HTTPServerAddress)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot start server")
+	}
 }
